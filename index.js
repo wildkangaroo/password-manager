@@ -1,92 +1,103 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1XbsKGQ2f5t34n4K6yoxQWjUc25dqzuGmxVt_0Hq94fc/edit?usp=sharing';
-    const spreadsheetId = '1XbsKGQ2f5t34n4K6yoxQWjUc25dqzuGmxVt_0Hq94fc';
-    const apiKey = 'YOUR_GOOGLE_API_KEY'; // You need to replace this with your actual API key
+    const GIST_ID = '5b9d875032016dfafcc54eb8c5b16dad';  // Replace with your Gist ID
+    const GIST_URL = `https://gist.github.com/wildkangaroo/5b9d875032016dfafcc54eb8c5b16dad`;
+    let passwordTable = document.getElementById('passwordTable').getElementsByTagName('tbody')[0];
+    let addButton = document.getElementById('addButton');
+    let saveButton = document.getElementById('saveButton');
+    let cancelButton = document.getElementById('cancelButton');
+    let formContainer = document.getElementById('formContainer');
+    let websiteInput = document.getElementById('website');
+    let usernameInput = document.getElementById('username');
+    let passwordInput = document.getElementById('password');
+    let currentData = [];
 
-    // Initialize Tabletop
-    Tabletop.init({
-        key: SPREADSHEET_URL,
-        simpleSheet: true,
-        callback: function (data) {
-            loadTable(data);
+    function fetchData() {
+        fetch(GIST_URL)
+            .then(response => response.json())
+            .then(data => {
+                currentData = JSON.parse(data.files['data.json'].content);
+                renderTable();
+            });
+    }
+
+    function saveData() {
+        const token = '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';  // Replace with your GitHub Personal Access Token
+        fetch(GIST_URL, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `token ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                files: {
+                    'data.json': {
+                        content: JSON.stringify(currentData, null, 2)
+                    }
+                }
+            })
+        }).then(response => response.json())
+          .then(data => {
+              alert('Data saved successfully!');
+              fetchData();
+          });
+    }
+
+    function renderTable() {
+        passwordTable.innerHTML = '';
+        currentData.forEach((entry, index) => {
+            let row = passwordTable.insertRow();
+            row.insertCell(0).innerText = entry.website;
+            row.insertCell(1).innerText = entry.username;
+            row.insertCell(2).innerText = entry.password;
+            let actions = row.insertCell(3);
+            let editButton = document.createElement('button');
+            editButton.innerText = 'Edit';
+            editButton.onclick = () => handleEditClick(index);
+            actions.appendChild(editButton);
+            let deleteButton = document.createElement('button');
+            deleteButton.innerText = 'Delete';
+            deleteButton.onclick = () => handleDeleteClick(index);
+            actions.appendChild(deleteButton);
+        });
+    }
+
+    function handleAddClick() {
+        formContainer.classList.remove('hidden');
+        websiteInput.value = '';
+        usernameInput.value = '';
+        passwordInput.value = '';
+        saveButton.onclick = handleSaveClick;
+    }
+
+    function handleEditClick(index) {
+        formContainer.classList.remove('hidden');
+        websiteInput.value = currentData[index].website;
+        usernameInput.value = currentData[index].username;
+        passwordInput.value = currentData[index].password;
+        saveButton.onclick = () => handleSaveClick(index);
+    }
+
+    function handleDeleteClick(index) {
+        currentData.splice(index, 1);
+        saveData();
+    }
+
+    function handleSaveClick(index) {
+        let entry = {
+            website: websiteInput.value,
+            username: usernameInput.value,
+            password: passwordInput.value
+        };
+        if (index >= 0) {
+            currentData[index] = entry;
+        } else {
+            currentData.push(entry);
         }
-    });
-
-    // Function to load the table
-    function loadTable(data) {
-        const tbody = document.querySelector('#passwordTable tbody');
-        tbody.innerHTML = ''; // Clear existing data
-
-        data.forEach((entry, index) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${entry.Website}</td>
-                <td>${entry.Username}</td>
-                <td>${entry.Password}</td>
-                <td>
-                    <button class="editButton" data-index="${index}">Edit</button>
-                    <button class="deleteButton" data-index="${index}">Delete</button>
-                </td>
-            `;
-            tbody.appendChild(row);
-        });
-
-        // Add event listeners for edit and delete buttons
-        document.querySelectorAll('.editButton').forEach(button => {
-            button.addEventListener('click', editEntry);
-        });
-        document.querySelectorAll('.deleteButton').forEach(button => {
-            button.addEventListener('click', deleteEntry);
-        });
+        saveData();
+        formContainer.classList.add('hidden');
     }
 
-    // Function to handle adding new entry
-    document.getElementById('addButton').addEventListener('click', function () {
-        document.getElementById('formContainer').classList.remove('hidden');
-    });
-
-    // Function to handle saving an entry
-    document.getElementById('saveButton').addEventListener('click', function () {
-        const website = document.getElementById('website').value;
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
-
-        // Save the data to Google Sheets
-        // For simplicity, here we'll just log the data. You need to send a request to your backend to update Google Sheets
-        console.log('Save', { website, username, password });
-
-        // Hide the form and clear fields
-        document.getElementById('formContainer').classList.add('hidden');
-        document.getElementById('website').value = '';
-        document.getElementById('username').value = '';
-        document.getElementById('password').value = '';
-
-        // Reload the table (re-fetch the data)
-        Tabletop.init({
-            key: SPREADSHEET_URL,
-            simpleSheet: true,
-            callback: function (data) {
-                loadTable(data);
-            }
-        });
-    });
-
-    // Function to handle cancel button
-    document.getElementById('cancelButton').addEventListener('click', function () {
-        document.getElementById('formContainer').classList.add('hidden');
-    });
-
-    // Function to handle editing an entry
-    function editEntry(event) {
-        const index = event.target.getAttribute('data-index');
-        // Load the entry data into the form (For simplicity, here we'll just log the index)
-        console.log('Edit', index);
-    }
-
-    // Function to handle deleting an entry
-    function deleteEntry(event) {
-        const index = event.target.getAttribute('data-index');
-        // Delete the entry from Google Sheets (For simplicity, here we'll just log the index)
-        console.log('Delete', index);
-    }
+    cancelButton.onclick = () => formContainer.classList.add('hidden');
+    addButton.onclick = handleAddClick;
+    fetchData();
 });
